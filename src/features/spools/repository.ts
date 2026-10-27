@@ -95,3 +95,15 @@ export async function getInventorySummary(db: SQLiteDatabase): Promise<Inventory
     empty: r.empty,
   }));
 }
+
+export async function createSpools(
+  db: SQLiteDatabase,
+  input: NewSpool,
+  quantity: number,
+): Promise<void> {
+  await db.withTransactionAsync(async () => {
+    for (let i = 0; i < quantity; i++) {
+      await createSpool(db, input);
+    }
+  });
+}
