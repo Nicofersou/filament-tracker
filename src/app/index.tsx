@@ -30,7 +30,16 @@ export default function InventoryScreen() {
         <Text style={styles.empty}>Todavía no hay bobinas. Añade la primera.</Text>
       ) : (
         summary.map((row) => (
-          <View key={`${row.material}-${row.colorName}`} style={styles.row}>
+          <Pressable
+            key={`${row.material}-${row.colorName}`}
+            style={styles.row}
+            onPress={() =>
+              router.push({
+                pathname: '/spools',
+                params: { material: row.material, colorName: row.colorName },
+              })
+            }
+          >
             <View style={[styles.dot, { backgroundColor: row.colorHex ?? '#ccc' }]} />
             <View style={styles.rowText}>
               <Text style={styles.rowTitle}>
@@ -40,7 +49,8 @@ export default function InventoryScreen() {
                 {row.sealed} sin abrir · {row.inUse} en uso · {row.empty} gastadas
               </Text>
             </View>
-          </View>
+            <Text style={styles.chevron}>›</Text>
+          </Pressable>
         ))
       )}
 
@@ -68,4 +78,5 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   addButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  chevron: { fontSize: 28, color: '#999' },
 });

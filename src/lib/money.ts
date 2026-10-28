@@ -7,3 +7,8 @@ export function parseEurosToCents(input: string): number | null {
   const [whole, fraction = ''] = value.split('.');
   return Number(whole) * 100 + Number(fraction.padEnd(2, '0'));
 }
+
+/** Formatea céntimos como "12,99 €". */
+export function formatCents(cents: number): string {
+  return `${(cents / 100).toFixed(2).replace('.', ',')} €`;
+}

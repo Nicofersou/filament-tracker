@@ -107,3 +107,58 @@ export async function createSpools(
     }
   });
 }
+
+export async function listSpoolsByColor(
+  db: SQLiteDatabase,
+  material: string,
+  colorName: string,
+): Promise<Spool[]> {
+  const rows = await db.getAllAsync<SpoolRow>(
+    `SELECT * FROM spools
+      WHERE material = ? AND color_name = ?
+      ORDER BY CASE status WHEN 'in_use' THEN 0 WHEN 'sealed' THEN 1 ELSE 2 END, id DESC`,
+    [material, colorName],
+  );
+  return rows.map(toSpool);
+}
+
+export async function updateSpoolStatus(
+  db: SQLiteDatabase,
+  id: number,
+  status: SpoolStatus,
+): Promise<void> {
+  const now = new Date().toISOString();
+
+  switch (status) {
+    case 'in_use':
+      await db.runAsync(
+        `UPDATE spools
+            SET status = 'in_use', opened_at = COALESCE(opened_at, ?), finished_at = NULL
+          WHERE id = ?`,
+        [now, id],
+      );
+      break;
+    case 'empty':
+      await db.runAsync(
+        `UPDATE spools
+            SET status = 'empty', remaining_weight_g = 0,
+                opened_at = COALESCE(opened_at, ?), finished_at = ?
+          WHERE id = ?`,
+        [now, now, id],
+      );
+      break;
+    case 'sealed':
+      await db.runAsync(
+        `UPDATE spools
+            SET status = 'sealed', remaining_weight_g = initial_weight_g,
+                opened_at = NULL, finished_at = NULL
+          WHERE id = ?`,
+        [id],
+      );
+      break;
+  }
+}
+
+export async function deleteSpool(db: SQLiteDatabase, id: number): Promise<void> {
+  await db.runAsync('DELETE FROM spools WHERE id = ?', [id]);
+}

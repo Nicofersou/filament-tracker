@@ -11,6 +11,7 @@ export default function RootLayout() {
           name="add-spool"
           options={{ title: 'Añadir bobinas', presentation: 'modal' }}
         />
+        <Stack.Screen name="spools" options={{ title: 'Bobinas' }} />
       </Stack>
     </SQLiteProvider>
   );
