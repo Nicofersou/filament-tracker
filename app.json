@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "filament-tracker",
+    "name": "Filament Tracker",
     "slug": "filament-tracker",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -17,7 +17,8 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.nico.filamenttracker"
     },
     "web": {
       "output": "server",
@@ -38,6 +39,16 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "204d5fde-3e4e-45f0-ba30-933e704cb84a"
+      }
     }
   }
 }
