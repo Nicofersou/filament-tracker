@@ -1,6 +1,5 @@
 # Filament Tracker
 
-
 App móvil para llevar el inventario de filamentos de una impresora 3D y, próximamente, el
 registro de impresiones y su rentabilidad. Funciona 100 % en local en el móvil, sin cuentas ni servidor.
 
