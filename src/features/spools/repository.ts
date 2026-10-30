@@ -162,3 +162,8 @@ export async function updateSpoolStatus(
 export async function deleteSpool(db: SQLiteDatabase, id: number): Promise<void> {
   await db.runAsync('DELETE FROM spools WHERE id = ?', [id]);
 }
+
+export async function getSpoolById(db: SQLiteDatabase, id: number): Promise<Spool | null> {
+  const row = await db.getFirstAsync<SpoolRow>('SELECT * FROM spools WHERE id = ?', [id]);
+  return row ? toSpool(row) : null;
+}
