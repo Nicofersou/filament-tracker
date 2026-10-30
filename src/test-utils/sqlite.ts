@@ -6,7 +6,7 @@ type Params = unknown[];
 /** Base de datos SQLite real en memoria con la parte de la API de expo-sqlite que usa la app. */
 export function createTestDb(): SQLiteDatabase {
   const db = new Database(':memory:');
-
+  db.pragma('foreign_keys = OFF');
   const adapter = {
     async execAsync(sql: string) {
       db.exec(sql);
