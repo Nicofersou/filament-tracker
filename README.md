@@ -1,56 +1,50 @@
-# Welcome to your Expo app 👋
+# Filament Tracker
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+![CI](https://github.com/Nicofersou/filament-tracker/actions/workflows/ci.yml/badge.svg)
 
-## Get started
+App móvil para llevar el inventario de filamentos de una impresora 3D y, próximamente, el
+registro de impresiones y su rentabilidad. Funciona 100 % en local en el móvil, sin cuentas ni servidor.
 
-1. Install dependencies
+## Funcionalidades
 
-   ```bash
-   npm install
-   ```
+- Inventario de bobinas por material y color.
+- Estados de cada bobina: sin abrir, en uso y gastada.
+- Resumen por color con las bobinas que quedan por empezar y las gastadas.
+- Alta de varias bobinas iguales de golpe, con validación del formulario.
 
-2. Start the app
+## Hoja de ruta
 
-   ```bash
-   npx expo start
-   ```
+- [x] Fase 1: inventario de bobinas
+- [ ] Fase 2: registro de impresiones y coste (material, electricidad, desgaste)
+- [ ] Fase 3: ventas, margen y estadísticas de rentabilidad
 
-In the output, you'll find options to open the app in a
+## Stack
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+Expo (React Native) · TypeScript · Expo Router · SQLite (`expo-sqlite`) · Zod · Jest ·
+ESLint + Prettier · GitHub Actions
 
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## Cómo ejecutarlo
 
-## Get a fresh project
-
-When you're ready, run:
+Requisitos: Node 24 y la app Expo Go en el móvil.
 
 ```bash
-npm run reset-project
+npm install
+npx expo start
 ```
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+Escanea el QR con Expo Go (móvil y PC en la misma red).
 
-### Other setup steps
+Scripts útiles: `npm test`, `npm run lint`, `npm run format`.
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+## Decisiones de diseño
 
-## Learn more
+- **Local-first:** los datos viven en SQLite en el dispositivo; no hay backend.
+- **Migraciones versionadas** con `PRAGMA user_version`; una migración ya aplicada no se edita.
+- **Dinero en céntimos** (enteros) para evitar errores de redondeo.
+- **Validación con Zod** en los formularios, más restricciones `CHECK` en la propia base de datos.
+- **Consultas parametrizadas**: el texto del usuario nunca se concatena en el SQL.
+- **Estructura por funcionalidades** (`src/features/...`), con pantallas finas y lógica separada.
 
-To learn more about developing your project with Expo, look at the following resources:
+## Capturas
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+<!-- Añade aquí capturas de pantalla desde docs/screenshots/ -->
