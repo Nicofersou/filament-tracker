@@ -40,4 +40,18 @@ describe('spoolFormSchema', () => {
   ])('rechaza %s', (_name, override) => {
     expect(spoolFormSchema.safeParse({ ...valid, ...override }).success).toBe(false);
   });
+
+  it('muestra el mensaje propio de cada campo', () => {
+    const hex = spoolFormSchema.safeParse({ ...valid, colorHex: 'rojo' });
+    expect(hex.success).toBe(false);
+    if (!hex.success) {
+      expect(hex.error.issues[0]?.message).toBe('Usa el formato #RRGGBB (ej. #FF0000)');
+    }
+
+    const price = spoolFormSchema.safeParse({ ...valid, price: '12,999' });
+    expect(price.success).toBe(false);
+    if (!price.success) {
+      expect(price.error.issues[0]?.message).toBe('Precio no válido (ej. 12,99)');
+    }
+  });
 });

@@ -39,3 +39,9 @@ export interface InventoryRow {
   inUse: number;
   empty: number;
 }
+
+export const STATUS_LABELS: Record<SpoolStatus, string> = {
+  sealed: 'Sin abrir',
+  in_use: 'En uso',
+  empty: 'Gastada',
+};

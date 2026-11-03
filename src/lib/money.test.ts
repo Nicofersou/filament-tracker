@@ -1,4 +1,4 @@
-import { formatCents, parseEurosToCents } from './money';
+import { centsToInput, formatCents, parseEurosToCents } from './money';
 
 describe('parseEurosToCents', () => {
   it.each([
@@ -24,5 +24,19 @@ describe('formatCents', () => {
     [0, '0,00 €'],
   ])('formatea %i céntimos como "%s"', (cents, expected) => {
     expect(formatCents(cents)).toBe(expected);
+  });
+});
+
+describe('centsToInput', () => {
+  it.each([
+    [29900, '299,00'],
+    [1299, '12,99'],
+    [5, '0,05'],
+  ])('convierte %i céntimos en "%s"', (cents, expected) => {
+    expect(centsToInput(cents)).toBe(expected);
+  });
+
+  it('es el inverso de parseEurosToCents', () => {
+    expect(parseEurosToCents(centsToInput(1999))).toBe(1999);
   });
 });

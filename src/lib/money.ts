@@ -12,3 +12,8 @@ export function parseEurosToCents(input: string): number | null {
 export function formatCents(cents: number): string {
   return `${(cents / 100).toFixed(2).replace('.', ',')} €`;
 }
+
+/** Convierte céntimos a texto de formulario: 29900 -> "299,00". */
+export function centsToInput(cents: number): string {
+  return (cents / 100).toFixed(2).replace('.', ',');
+}

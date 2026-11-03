@@ -1,22 +1,18 @@
 import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useState } from 'react';
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { formatDate } from '../lib/dates';
-import { formatCents } from '../lib/money';
+import { Alert, StyleSheet, View } from 'react-native';
+import { AppText, Button, Card, EmptyState, Screen, StatusBadge } from '../components/ui';
 import { deleteSpool, listSpoolsByColor, updateSpoolStatus } from '../features/spools/repository';
 import type { Spool, SpoolStatus } from '../features/spools/types';
-
-const STATUS_LABELS: Record<SpoolStatus, string> = {
-  sealed: 'Sin abrir',
-  in_use: 'En uso',
-  empty: 'Gastada',
-};
+import { formatDate } from '../lib/dates';
+import { formatCents } from '../lib/money';
+import { spacing } from '../theme';
 
 export default function SpoolsByColorScreen() {
   const db = useSQLiteContext();
   const { material, colorName } = useLocalSearchParams<{ material: string; colorName: string }>();
-  const [spools, setSpools] = useState<Spool[]>([]);
+  const [spools, setSpools] = useState<Spool[] | null>(null);
 
   const load = useCallback(async () => {
     if (!material || !colorName) return;
@@ -64,98 +60,62 @@ export default function SpoolsByColorScreen() {
   return (
     <>
       <Stack.Screen options={{ title: `${material ?? ''} · ${colorName ?? ''}` }} />
-      <FlatList
-        contentContainerStyle={styles.list}
-        data={spools}
-        keyExtractor={(item) => String(item.id)}
-        ListEmptyComponent={<Text style={styles.empty}>No hay bobinas de este color.</Text>}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.status}>{STATUS_LABELS[item.status]}</Text>
-              {item.priceCents !== null ? <Text>{formatCents(item.priceCents)}</Text> : null}
+      <Screen>
+        {spools !== null && spools.length === 0 ? (
+          <EmptyState title="Sin bobinas" message="No quedan bobinas de este color." />
+        ) : null}
+
+        {(spools ?? []).map((item) => (
+          <Card key={item.id} style={styles.card}>
+            <View style={styles.header}>
+              <StatusBadge status={item.status} />
+              {item.priceCents !== null ? (
+                <AppText variant="caption" tone="secondary">
+                  {formatCents(item.priceCents)}
+                </AppText>
+              ) : null}
             </View>
 
-            {item.brand ? <Text>{item.brand}</Text> : null}
-            {item.openedAt ? <Text>Abierta: {formatDate(item.openedAt)}</Text> : null}
-            {item.finishedAt ? <Text>Gastada: {formatDate(item.finishedAt)}</Text> : null}
+            <View style={styles.details}>
+              {item.brand ? <AppText tone="secondary">{item.brand}</AppText> : null}
+              {item.status === 'in_use' ? (
+                <AppText tone="secondary">≈ {item.remainingWeightG} g restantes (aprox.)</AppText>
+              ) : null}
+              {item.openedAt ? (
+                <AppText tone="secondary">Abierta el {formatDate(item.openedAt)}</AppText>
+              ) : null}
+              {item.finishedAt ? (
+                <AppText tone="secondary">Gastada el {formatDate(item.finishedAt)}</AppText>
+              ) : null}
+            </View>
 
             <View style={styles.actions}>
               {item.status === 'sealed' ? (
-                <ActionButton
-                  label="Abrir"
-                  onPress={() => void changeStatus(item, 'in_use')}
-                  primary
-                />
+                <Button label="Abrir" small onPress={() => void changeStatus(item, 'in_use')} />
               ) : null}
               {item.status === 'in_use' ? (
                 <>
-                  <ActionButton
-                    label="Marcar gastada"
-                    onPress={() => confirmFinish(item)}
-                    primary
-                  />
-                  <ActionButton
+                  <Button label="Marcar gastada" small onPress={() => confirmFinish(item)} />
+                  <Button
                     label="Volver a sin abrir"
+                    small
+                    variant="secondary"
                     onPress={() => void changeStatus(item, 'sealed')}
                   />
                 </>
               ) : null}
-              <ActionButton label="Eliminar" onPress={() => confirmDelete(item)} danger />
+              <Button label="Eliminar" small variant="danger" onPress={() => confirmDelete(item)} />
             </View>
-          </View>
-        )}
-      />
+          </Card>
+        ))}
+      </Screen>
     </>
   );
 }
 
-function ActionButton({
-  label,
-  onPress,
-  primary,
-  danger,
-}: {
-  label: string;
-  onPress: () => void;
-  primary?: boolean;
-  danger?: boolean;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.button, primary && styles.buttonPrimary, danger && styles.buttonDanger]}
-    >
-      <Text
-        style={[
-          styles.buttonText,
-          primary && styles.buttonTextPrimary,
-          danger && styles.buttonTextDanger,
-        ]}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
-  list: { padding: 16, gap: 12 },
-  empty: { textAlign: 'center', marginTop: 32, color: '#666' },
-  card: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 14, gap: 4 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between' },
-  status: { fontSize: 16, fontWeight: '700' },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
-  button: {
-    borderWidth: 1,
-    borderColor: '#bbb',
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  buttonPrimary: { backgroundColor: '#2563eb', borderColor: '#2563eb' },
-  buttonDanger: { borderColor: '#c0392b' },
-  buttonText: { color: '#333' },
-  buttonTextPrimary: { color: '#fff', fontWeight: '600' },
-  buttonTextDanger: { color: '#c0392b' },
+  card: { gap: spacing.md },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  details: { gap: spacing.xs },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
 });
