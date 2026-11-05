@@ -6,6 +6,7 @@ interface PrinterRow {
   brand: string;
   model: string;
   power_w: number | null;
+  dryer_power_w: number | null;
   cost_cents: number | null;
   lifetime_hours: number | null;
   archived_at: string | null;
@@ -18,6 +19,7 @@ function toPrinter(row: PrinterRow): Printer {
     brand: row.brand,
     model: row.model,
     powerW: row.power_w,
+    dryerPowerW: row.dryer_power_w,
     costCents: row.cost_cents,
     lifetimeHours: row.lifetime_hours,
     archivedAt: row.archived_at,
@@ -27,12 +29,13 @@ function toPrinter(row: PrinterRow): Printer {
 
 export async function createPrinter(db: SQLiteDatabase, input: NewPrinter): Promise<number> {
   const result = await db.runAsync(
-    `INSERT INTO printers (brand, model, power_w, cost_cents, lifetime_hours)
-     VALUES (?, ?, ?, ?, ?)`,
+    `INSERT INTO printers (brand, model, power_w, dryer_power_w, cost_cents, lifetime_hours)
+     VALUES (?, ?, ?, ?, ?, ?)`,
     [
       input.brand,
       input.model,
       input.powerW ?? null,
+      input.dryerPowerW ?? null,
       input.costCents ?? null,
       input.lifetimeHours ?? null,
     ],
@@ -55,6 +58,7 @@ export async function listPrinters(
   return rows.map(toPrinter);
 }
 
+/** Sustituye todos los datos editables: lo que no se informe queda a null. */
 export async function updatePrinter(
   db: SQLiteDatabase,
   id: number,
@@ -62,12 +66,14 @@ export async function updatePrinter(
 ): Promise<void> {
   await db.runAsync(
     `UPDATE printers
-        SET brand = ?, model = ?, power_w = ?, cost_cents = ?, lifetime_hours = ?
+        SET brand = ?, model = ?, power_w = ?, dryer_power_w = ?,
+            cost_cents = ?, lifetime_hours = ?
       WHERE id = ?`,
     [
       input.brand,
       input.model,
       input.powerW ?? null,
+      input.dryerPowerW ?? null,
       input.costCents ?? null,
       input.lifetimeHours ?? null,
       id,

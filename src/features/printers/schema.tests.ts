@@ -4,10 +4,11 @@ const valid = {
   brand: 'Anycubic',
   model: 'Kobra 4 Combo',
   powerW: '100',
+  dryerPowerW: '200',
   price: '299,00',
   lifetimeHours: '3000',
 };
-const onlyRequired = { ...valid, powerW: '', price: '', lifetimeHours: '' };
+const onlyRequired = { ...valid, powerW: '', dryerPowerW: '', price: '', lifetimeHours: '' };
 
 describe('printerFormSchema', () => {
   it('acepta un formulario completo y otro con solo marca y modelo', () => {
@@ -21,6 +22,8 @@ describe('printerFormSchema', () => {
     ['consumo decimal', { powerW: '10.5' }],
     ['consumo cero', { powerW: '0' }],
     ['consumo exagerado', { powerW: '99999' }],
+    ['consumo de secado exagerado', { dryerPowerW: '99999' }],
+    ['consumo de secado decimal', { dryerPowerW: '20,5' }],
     ['precio inválido', { price: '12,999' }],
     ['vida útil cero', { lifetimeHours: '0' }],
   ])('rechaza %s', (_name, override) => {
@@ -42,6 +45,7 @@ describe('toNewPrinter', () => {
       brand: 'Anycubic',
       model: 'Kobra 4 Combo',
       powerW: 100,
+      dryerPowerW: 200,
       costCents: 29900,
       lifetimeHours: 3000,
     });
@@ -52,6 +56,7 @@ describe('toNewPrinter', () => {
       brand: 'Anycubic',
       model: 'Kobra 4 Combo',
       powerW: null,
+      dryerPowerW: null,
       costCents: null,
       lifetimeHours: null,
     });

@@ -72,8 +72,19 @@ const migrateToV2: Migration = async (db) => {
   `);
 };
 
-const MIGRATIONS: Migration[] = [migrateToV1, migrateToV2];
+/** v3: consumo del módulo de secado (impresora) y secado de cada impresión. */
+const migrateToV3: Migration = async (db) => {
+  await db.execAsync(`
+    ALTER TABLE printers ADD COLUMN dryer_power_w INTEGER
+      CHECK (dryer_power_w IS NULL OR dryer_power_w > 0);
+    ALTER TABLE prints ADD COLUMN drying_min INTEGER NOT NULL DEFAULT 0
+      CHECK (drying_min >= 0);
+    ALTER TABLE prints ADD COLUMN drying_cost_cents INTEGER NOT NULL DEFAULT 0
+      CHECK (drying_cost_cents >= 0);
+  `);
+};
 
+const MIGRATIONS: Migration[] = [migrateToV1, migrateToV2, migrateToV3];
 export const DATABASE_VERSION = MIGRATIONS.length;
 
 /**

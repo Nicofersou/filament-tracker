@@ -245,3 +245,72 @@ describe('deletePrint', () => {
     expect((await getSpoolById(db, spoolId))?.remainingWeightG).toBe(1000);
   });
 });
+
+describe('secado', () => {
+  async function createPrinterWithDryer() {
+    return createPrinter(db, {
+      brand: 'Anycubic',
+      model: 'Kobra 4 Combo',
+      powerW: 100,
+      costCents: 30000,
+      lifetimeHours: 3000,
+      dryerPowerW: 200,
+    });
+  }
+
+  it('calcula y guarda el coste del secado y lo suma al total', async () => {
+    const dryerPrinterId = await createPrinterWithDryer();
+
+    const id = await createPrint(db, {
+      ...basePrint,
+      printerId: dryerPrinterId,
+      dryingMin: 180,
+      spools: [{ spoolId, grams: 100 }],
+    });
+
+    expect(await getPrintDetail(db, id)).toMatchObject({
+      dryingMin: 180,
+      dryingCostCents: 9,
+      totalCostCents: 244,
+    });
+  });
+
+  it('guarda los minutos pero el secado cuesta 0 si la impresora no tiene consumo definido', async () => {
+    const id = await createPrint(db, {
+      ...basePrint,
+      printerId,
+      dryingMin: 180,
+      spools: [{ spoolId, grams: 100 }],
+    });
+
+    expect(await getPrintDetail(db, id)).toMatchObject({
+      dryingMin: 180,
+      dryingCostCents: 0,
+      totalCostCents: 235,
+    });
+  });
+
+  it('sin secado, los minutos y el coste de secado son 0', async () => {
+    const id = await createPrint(db, {
+      ...basePrint,
+      printerId,
+      spools: [{ spoolId, grams: 100 }],
+    });
+
+    expect(await getPrintDetail(db, id)).toMatchObject({ dryingMin: 0, dryingCostCents: 0 });
+  });
+
+  it('rechaza minutos de secado negativos y no deja rastro', async () => {
+    await expect(
+      createPrint(db, {
+        ...basePrint,
+        printerId,
+        dryingMin: -1,
+        spools: [{ spoolId, grams: 100 }],
+      }),
+    ).rejects.toThrow();
+
+    expect(await listPrints(db)).toHaveLength(0);
+    expect((await getSpoolById(db, spoolId))?.remainingWeightG).toBe(1000);
+  });
+});

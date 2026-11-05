@@ -35,7 +35,7 @@ describe('migrateDbIfNeeded', () => {
     expect(await getVersion(db)).toBe(DATABASE_VERSION);
   });
 
-  it('migrar de v1 a v2 conserva las bobinas existentes', async () => {
+  it('migrar desde v1 conserva las bobinas existentes', async () => {
     const db = createTestDb();
     await migrateDbIfNeeded(db, 1);
     expect(await getVersion(db)).toBe(1);
@@ -47,11 +47,45 @@ describe('migrateDbIfNeeded', () => {
 
     await migrateDbIfNeeded(db);
 
-    expect(await getVersion(db)).toBe(2);
+    expect(await getVersion(db)).toBe(DATABASE_VERSION);
     const spools = await db.getAllAsync<{ color_name: string; remaining_weight_g: number }>(
       'SELECT color_name, remaining_weight_g FROM spools',
     );
     expect(spools).toEqual([{ color_name: 'Negro', remaining_weight_g: 640 }]);
+  });
+
+  it('migrar de v2 a v3 conserva impresoras e impresiones y deja el secado a cero', async () => {
+    const db = createTestDb();
+    await migrateDbIfNeeded(db, 2);
+
+    const printer = await db.runAsync(
+      "INSERT INTO printers (brand, model, power_w) VALUES ('Anycubic', 'Kobra 4 Combo', 100)",
+    );
+    await db.runAsync(
+      `INSERT INTO prints (printer_id, name, printed_at, duration_min, energy_cost_cents)
+       VALUES (?, 'Pieza', '2026-10-30T10:00:00.000Z', 60, 5)`,
+      [printer.lastInsertRowId],
+    );
+
+    await migrateDbIfNeeded(db);
+
+    expect(await getVersion(db)).toBe(DATABASE_VERSION);
+    expect(await db.getAllAsync('SELECT brand, power_w, dryer_power_w FROM printers')).toEqual([
+      { brand: 'Anycubic', power_w: 100, dryer_power_w: null },
+    ]);
+    expect(
+      await db.getAllAsync(
+        'SELECT name, energy_cost_cents, drying_min, drying_cost_cents FROM prints',
+      ),
+    ).toEqual([{ name: 'Pieza', energy_cost_cents: 5, drying_min: 0, drying_cost_cents: 0 }]);
+  });
+
+  it('rechaza un consumo de secado que no sea positivo', async () => {
+    const db = createTestDb();
+    await migrateDbIfNeeded(db);
+    await expect(
+      db.runAsync("INSERT INTO printers (brand, model, dryer_power_w) VALUES ('A', 'B', 0)"),
+    ).rejects.toThrow();
   });
 
   it('activa las claves foráneas en cada apertura', async () => {

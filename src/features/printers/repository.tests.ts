@@ -59,4 +59,16 @@ describe('printers repository', () => {
     await setPrinterArchived(db, id, false);
     expect(await listPrinters(db)).toHaveLength(2);
   });
+
+  it('guarda y actualiza el consumo del módulo de secado', async () => {
+    const id = await createPrinter(db, {
+      brand: 'Anycubic',
+      model: 'Kobra 4 Combo',
+      dryerPowerW: 200,
+    });
+    expect((await getPrinter(db, id))?.dryerPowerW).toBe(200);
+
+    await updatePrinter(db, id, { brand: 'Anycubic', model: 'Kobra 4 Combo' });
+    expect((await getPrinter(db, id))?.dryerPowerW).toBeNull();
+  });
 });

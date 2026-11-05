@@ -7,6 +7,8 @@ export interface NewPrint {
   name: string;
   printedAt: string; // fecha ISO
   durationMin: number;
+  /** Minutos de secado atribuidos a esta impresión (0 por defecto). */
+  dryingMin?: number;
   result?: PrintResult; // 'success' por defecto
   notes?: string | null;
   spools: { spoolId: number; grams: number }[];
@@ -19,10 +21,12 @@ export interface PrintListItem {
   name: string;
   printedAt: string;
   durationMin: number;
+  dryingMin: number;
   result: PrintResult;
   materialCostCents: number;
   energyCostCents: number;
   wearCostCents: number;
+  dryingCostCents: number;
   totalCostCents: number;
   notes: string | null;
 }

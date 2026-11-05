@@ -18,9 +18,11 @@ interface PrintRow {
   name: string;
   printed_at: string;
   duration_min: number;
+  drying_min: number;
   result: string;
   energy_cost_cents: number;
   wear_cost_cents: number;
+  drying_cost_cents: number;
   notes: string | null;
   printer_brand: string;
   printer_model: string;
@@ -29,8 +31,8 @@ interface PrintRow {
 
 // Constante del código (nunca texto del usuario): se le añade WHERE/ORDER BY fijos.
 const PRINT_SELECT = `
-  SELECT p.id, p.printer_id, p.name, p.printed_at, p.duration_min, p.result,
-         p.energy_cost_cents, p.wear_cost_cents, p.notes,
+  SELECT p.id, p.printer_id, p.name, p.printed_at, p.duration_min, p.drying_min, p.result,
+         p.energy_cost_cents, p.wear_cost_cents, p.drying_cost_cents, p.notes,
          pr.brand AS printer_brand, pr.model AS printer_model,
          COALESCE(
            (SELECT SUM(u.cost_cents) FROM print_spool_usages u WHERE u.print_id = p.id), 0
@@ -46,11 +48,14 @@ function toListItem(row: PrintRow): PrintListItem {
     name: row.name,
     printedAt: row.printed_at,
     durationMin: row.duration_min,
+    dryingMin: row.drying_min,
     result: row.result as PrintResult,
     materialCostCents: row.material_cost_cents,
     energyCostCents: row.energy_cost_cents,
     wearCostCents: row.wear_cost_cents,
-    totalCostCents: row.material_cost_cents + row.energy_cost_cents + row.wear_cost_cents,
+    dryingCostCents: row.drying_cost_cents,
+    totalCostCents:
+      row.material_cost_cents + row.energy_cost_cents + row.wear_cost_cents + row.drying_cost_cents,
     notes: row.notes,
   };
 }
@@ -64,6 +69,7 @@ export async function createPrint(db: SQLiteDatabase, input: NewPrint): Promise<
     throw new CreatePrintError('DUPLICATE_SPOOL');
   }
 
+  const dryingMin = input.dryingMin ?? 0;
   let printId = 0;
 
   await db.withTransactionAsync(async () => {
@@ -89,6 +95,7 @@ export async function createPrint(db: SQLiteDatabase, input: NewPrint): Promise<
 
     const cost = calcPrintCost({
       durationMin: input.durationMin,
+      dryingMin,
       spools: usages.map(({ grams, priceCents, initialWeightG }) => ({
         grams,
         priceCents,
@@ -98,23 +105,26 @@ export async function createPrint(db: SQLiteDatabase, input: NewPrint): Promise<
         powerW: printer.powerW,
         costCents: printer.costCents,
         lifetimeHours: printer.lifetimeHours,
+        dryerPowerW: printer.dryerPowerW,
       },
       energyPricePerKwh,
     });
 
     const result = await db.runAsync(
       `INSERT INTO prints
-         (printer_id, name, printed_at, duration_min, result,
-          energy_cost_cents, wear_cost_cents, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+         (printer_id, name, printed_at, duration_min, drying_min, result,
+          energy_cost_cents, wear_cost_cents, drying_cost_cents, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         input.printerId,
         input.name,
         input.printedAt,
         input.durationMin,
+        dryingMin,
         input.result ?? 'success',
         cost.energyCents,
         cost.wearCents,
+        cost.dryingCents,
         input.notes ?? null,
       ],
     );

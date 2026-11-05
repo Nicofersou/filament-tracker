@@ -13,6 +13,7 @@ import { spacing } from '../../theme';
 function describePrinter(printer: Printer): string {
   const parts: string[] = [];
   if (printer.powerW !== null) parts.push(`${printer.powerW} W`);
+  if (printer.dryerPowerW !== null) parts.push(`secado ${printer.dryerPowerW} W`);
   if (printer.costCents !== null) parts.push(formatCents(printer.costCents));
   if (printer.lifetimeHours !== null) parts.push(`${printer.lifetimeHours} h de vida útil`);
   return parts.length > 0 ? parts.join(' · ') : 'Sin datos de consumo ni coste todavía';

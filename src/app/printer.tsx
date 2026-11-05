@@ -22,6 +22,7 @@ export default function PrinterScreen() {
   const [brand, setBrand] = useState('');
   const [model, setModel] = useState('');
   const [powerW, setPowerW] = useState('');
+  const [dryerPowerW, setDryerPowerW] = useState('');
   const [price, setPrice] = useState('');
   const [lifetimeHours, setLifetimeHours] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -34,13 +35,21 @@ export default function PrinterScreen() {
       setBrand(printer.brand);
       setModel(printer.model);
       setPowerW(printer.powerW === null ? '' : String(printer.powerW));
+      setDryerPowerW(printer.dryerPowerW === null ? '' : String(printer.dryerPowerW));
       setPrice(printer.costCents === null ? '' : centsToInput(printer.costCents));
       setLifetimeHours(printer.lifetimeHours === null ? '' : String(printer.lifetimeHours));
     });
   }, [db, printerId]);
 
   const handleSave = async () => {
-    const result = printerFormSchema.safeParse({ brand, model, powerW, price, lifetimeHours });
+    const result = printerFormSchema.safeParse({
+      brand,
+      model,
+      powerW,
+      dryerPowerW,
+      price,
+      lifetimeHours,
+    });
 
     if (!result.success) {
       const fieldErrors: Record<string, string> = {};
@@ -123,6 +132,14 @@ export default function PrinterScreen() {
           keyboardType="number-pad"
           hint="Mira las especificaciones del fabricante o mídelo con un enchufe medidor."
           error={errors.powerW}
+        />
+        <TextField
+          label="Consumo medio del módulo de secado en W (opcional)"
+          value={dryerPowerW}
+          onChangeText={setDryerPowerW}
+          keyboardType="number-pad"
+          hint="Mídelo con un enchufe medidor en un secado típico (kWh consumidos ÷ horas). La potencia máxima de la ficha no es el promedio."
+          error={errors.dryerPowerW}
         />
         <TextField
           label="Precio de la impresora en € (opcional)"

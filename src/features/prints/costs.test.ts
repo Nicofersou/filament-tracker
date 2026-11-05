@@ -1,4 +1,5 @@
 import {
+  calcDryingCostCents,
   calcEnergyCostCents,
   calcMaterialCostCents,
   calcPrintCost,
@@ -36,6 +37,22 @@ describe('calcEnergyCostCents', () => {
   });
 });
 
+describe('calcDryingCostCents', () => {
+  it('calcula el coste eléctrico del secado', () => {
+    // 200 W durante 3 h = 0,6 kWh * 0,15 €/kWh = 0,09 €
+    expect(calcDryingCostCents(180, 200, 0.15)).toBe(9);
+  });
+
+  it('devuelve 0 si falta el consumo del secado o el precio de la luz', () => {
+    expect(calcDryingCostCents(180, null, 0.15)).toBe(0);
+    expect(calcDryingCostCents(180, 200, null)).toBe(0);
+  });
+
+  it('devuelve 0 si no hay tiempo de secado', () => {
+    expect(calcDryingCostCents(0, 200, 0.15)).toBe(0);
+  });
+});
+
 describe('calcWearCostCents', () => {
   it('amortiza la impresora según las horas de uso', () => {
     expect(calcWearCostCents(180, 30000, 3000)).toBe(30);
@@ -59,9 +76,41 @@ describe('calcPrintCost', () => {
       materialCents: 200,
       energyCents: 5,
       wearCents: 30,
+      dryingCents: 0,
       totalCents: 235,
       missing: [],
     });
+  });
+
+  it('incluye el secado en el total', () => {
+    expect(
+      calcPrintCost({
+        durationMin: 180,
+        dryingMin: 180,
+        spools: [spool],
+        printer: { ...printer, dryerPowerW: 200 },
+        energyPricePerKwh: 0.15,
+      }),
+    ).toEqual({
+      materialCents: 200,
+      energyCents: 5,
+      wearCents: 30,
+      dryingCents: 9,
+      totalCents: 244,
+      missing: [],
+    });
+  });
+
+  it('avisa si hay secado pero no se conoce el consumo del módulo', () => {
+    const result = calcPrintCost({
+      durationMin: 180,
+      dryingMin: 60,
+      spools: [spool],
+      printer,
+      energyPricePerKwh: 0.15,
+    });
+    expect(result.dryingCents).toBe(0);
+    expect(result.missing).toEqual(['dryerPower']);
   });
 
   it('suma el material de varias bobinas redondeando cada una', () => {
