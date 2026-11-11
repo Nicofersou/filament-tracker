@@ -17,3 +17,10 @@ export function formatCents(cents: number): string {
 export function centsToInput(cents: number): string {
   return (cents / 100).toFixed(2).replace('.', ',');
 }
+
+/** Formatea céntimos con signo explícito: "+3,50 €", "-1,20 €" o "0,00 €". */
+export function formatSignedCents(cents: number): string {
+  if (cents > 0) return `+${formatCents(cents)}`;
+  if (cents < 0) return `-${formatCents(-cents)}`;
+  return formatCents(0);
+}

@@ -11,6 +11,8 @@ export interface NewPrint {
   dryingMin?: number;
   result?: PrintResult; // 'success' por defecto
   notes?: string | null;
+  /** Venta ya conocida al registrar la impresión (opcional). */
+  sale?: { priceCents: number; feesCents?: number } | null;
   spools: { spoolId: number; grams: number }[];
 }
 
@@ -28,6 +30,11 @@ export interface PrintListItem {
   wearCostCents: number;
   dryingCostCents: number;
   totalCostCents: number;
+  /** Total cobrado por la impresión (null si no se ha vendido). */
+  salePriceCents: number | null;
+  saleFeesCents: number;
+  /** Beneficio = venta − comisiones − coste (null si no se ha vendido). */
+  profitCents: number | null;
   notes: string | null;
 }
 
@@ -58,6 +65,18 @@ export class CreatePrintError extends Error {
   constructor(code: CreatePrintErrorCode) {
     super(code);
     this.name = 'CreatePrintError';
+    this.code = code;
+  }
+}
+
+export type PrintSaleErrorCode = 'PRINT_NOT_FOUND' | 'PRINT_FAILED';
+
+export class PrintSaleError extends Error {
+  readonly code: PrintSaleErrorCode;
+
+  constructor(code: PrintSaleErrorCode) {
+    super(code);
+    this.name = 'PrintSaleError';
     this.code = code;
   }
 }

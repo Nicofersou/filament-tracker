@@ -5,7 +5,14 @@ import { createTestDb } from '../../test-utils/sqlite';
 import { createPrinter, setPrinterArchived } from '../printers/repository';
 import { setEnergyPrice } from '../settings/repository';
 import { createSpool, getSpoolById, updateSpoolStatus } from '../spools/repository';
-import { createPrint, deletePrint, getPrintDetail, listPrints } from './repository';
+import {
+  createPrint,
+  deletePrint,
+  getPrintDetail,
+  listPrints,
+  updatePrintSale,
+} from './repository';
+import { parseEurosToCents } from '../../lib/money';
 
 let db: SQLiteDatabase;
 let printerId: number;
@@ -312,5 +319,119 @@ describe('secado', () => {
 
     expect(await listPrints(db)).toHaveLength(0);
     expect((await getSpoolById(db, spoolId))?.remainingWeightG).toBe(1000);
+  });
+});
+
+describe('venta', () => {
+  it('guarda la venta al crear la impresión y calcula el beneficio', async () => {
+    const id = await createPrint(db, {
+      ...basePrint,
+      printerId,
+      sale: { priceCents: 1500, feesCents: 100 },
+      spools: [{ spoolId, grams: 100 }],
+    });
+
+    expect(await getPrintDetail(db, id)).toMatchObject({
+      totalCostCents: 235,
+      salePriceCents: 1500,
+      saleFeesCents: 100,
+      profitCents: 1165,
+    });
+  });
+
+  it('sin venta, el beneficio es null y las comisiones son 0', async () => {
+    const id = await createPrint(db, {
+      ...basePrint,
+      printerId,
+      spools: [{ spoolId, grams: 100 }],
+    });
+
+    expect(await getPrintDetail(db, id)).toMatchObject({
+      salePriceCents: null,
+      saleFeesCents: 0,
+      profitCents: null,
+    });
+  });
+
+  it('rechaza una venta en una impresión fallida y no deja rastro', async () => {
+    await expect(
+      createPrint(db, {
+        ...basePrint,
+        printerId,
+        result: 'failed',
+        sale: { priceCents: 1500 },
+        spools: [{ spoolId, grams: 100 }],
+      }),
+    ).rejects.toMatchObject({ code: 'PRINT_FAILED' });
+
+    expect(await listPrints(db)).toHaveLength(0);
+    expect((await getSpoolById(db, spoolId))?.remainingWeightG).toBe(1000);
+  });
+
+  it('permite registrar, cambiar y quitar la venta después', async () => {
+    const id = await createPrint(db, {
+      ...basePrint,
+      printerId,
+      spools: [{ spoolId, grams: 100 }],
+    });
+
+    await updatePrintSale(db, id, { priceCents: 1000, feesCents: 0 });
+    expect(await getPrintDetail(db, id)).toMatchObject({
+      salePriceCents: 1000,
+      profitCents: 765,
+    });
+
+    await updatePrintSale(db, id, { priceCents: 2000, feesCents: 200 });
+    expect(await getPrintDetail(db, id)).toMatchObject({
+      salePriceCents: 2000,
+      saleFeesCents: 200,
+      profitCents: 1565,
+    });
+
+    await updatePrintSale(db, id, null);
+    expect(await getPrintDetail(db, id)).toMatchObject({
+      salePriceCents: null,
+      saleFeesCents: 0,
+      profitCents: null,
+    });
+  });
+
+  it('no se puede vender una impresión fallida ni una que no existe', async () => {
+    const failedId = await createPrint(db, {
+      ...basePrint,
+      printerId,
+      result: 'failed',
+      spools: [{ spoolId, grams: 10 }],
+    });
+
+    await expect(
+      updatePrintSale(db, failedId, { priceCents: 1000, feesCents: 0 }),
+    ).rejects.toMatchObject({ code: 'PRINT_FAILED' });
+    await expect(
+      updatePrintSale(db, 999, { priceCents: 1000, feesCents: 0 }),
+    ).rejects.toMatchObject({ code: 'PRINT_NOT_FOUND' });
+  });
+
+  it('la lista incluye el beneficio de las impresiones vendidas', async () => {
+    await createPrint(db, {
+      ...basePrint,
+      name: 'Vendida',
+      printerId,
+      sale: { priceCents: 1000 },
+      spools: [{ spoolId, grams: 100 }],
+    });
+    await createPrint(db, {
+      ...basePrint,
+      name: 'Sin vender',
+      printedAt: '2026-10-29T10:00:00.000Z',
+      printerId,
+      spools: [{ spoolId, grams: 100 }],
+    });
+
+    const items = await listPrints(db);
+    expect(items.map((p) => [p.name, p.profitCents])).toEqual([
+      ['Vendida', 765],
+      ['Sin vender', null],
+    ]);
   });
 });

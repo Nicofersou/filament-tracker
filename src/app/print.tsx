@@ -9,6 +9,7 @@ import type { PrintDetail } from '../features/prints/types';
 import { formatDate, formatDuration } from '../lib/dates';
 import { formatCents } from '../lib/money';
 import { radius, spacing, useTheme } from '../theme';
+import { ProfitSummary } from '../features/prints/ProfitSummary';
 
 export default function PrintDetailScreen() {
   const db = useSQLiteContext();
@@ -89,6 +90,31 @@ export default function PrintDetailScreen() {
             showDrying={detail.dryingMin > 0}
           />
         </Card>
+        {detail.result === 'success' ? (
+          <>
+            <SectionTitle>Venta</SectionTitle>
+            <Card style={styles.card}>
+              {detail.salePriceCents !== null && detail.profitCents !== null ? (
+                <ProfitSummary
+                  salePriceCents={detail.salePriceCents}
+                  saleFeesCents={detail.saleFeesCents}
+                  totalCostCents={detail.totalCostCents}
+                  profitCents={detail.profitCents}
+                />
+              ) : (
+                <AppText tone="secondary">Sin venta registrada.</AppText>
+              )}
+              <Button
+                label={detail.salePriceCents === null ? 'Registrar venta' : 'Editar venta'}
+                variant="secondary"
+                small
+                onPress={() =>
+                  router.push({ pathname: '/sale', params: { id: String(detail.id) } })
+                }
+              />
+            </Card>
+          </>
+        ) : null}
 
         <SectionTitle>Material</SectionTitle>
         <Card style={styles.card}>

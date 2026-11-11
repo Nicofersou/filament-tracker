@@ -3,15 +3,17 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { AppText, Button, Card, EmptyState, Screen } from '../../components/ui';
+import { summarizeSales } from '../../features/prints/profit';
 import { listPrints } from '../../features/prints/repository';
 import type { PrintListItem } from '../../features/prints/types';
 import { formatDate, formatDuration } from '../../lib/dates';
-import { formatCents } from '../../lib/money';
-import { spacing } from '../../theme';
+import { formatCents, formatSignedCents } from '../../lib/money';
+import { spacing, useTheme } from '../../theme';
 
 export default function PrintsScreen() {
   const db = useSQLiteContext();
   const router = useRouter();
+  const { colors } = useTheme();
   const [prints, setPrints] = useState<PrintListItem[] | null>(null);
 
   useFocusEffect(
@@ -41,6 +43,7 @@ export default function PrintsScreen() {
   const failedCents = prints
     .filter((p) => p.result === 'failed')
     .reduce((sum, p) => sum + p.totalCostCents, 0);
+  const sales = summarizeSales(prints);
 
   return (
     <Screen>
@@ -52,6 +55,12 @@ export default function PrintsScreen() {
         {failedCents > 0 ? (
           <AppText variant="caption" tone="danger">
             {formatCents(failedCents)} en impresiones fallidas
+          </AppText>
+        ) : null}
+        {sales.soldCount > 0 ? (
+          <AppText variant="caption" tone="secondary">
+            {sales.soldCount === 1 ? '1 vendida' : `${sales.soldCount} vendidas`} · ingresos{' '}
+            {formatCents(sales.revenueCents)} · beneficio {formatSignedCents(sales.profitCents)}
           </AppText>
         ) : null}
       </Card>
@@ -76,7 +85,17 @@ export default function PrintsScreen() {
                 </AppText>
               ) : null}
             </View>
-            <AppText variant="heading">{formatCents(print.totalCostCents)}</AppText>
+            <View style={styles.amounts}>
+              <AppText variant="heading">{formatCents(print.totalCostCents)}</AppText>
+              {print.profitCents !== null ? (
+                <AppText
+                  variant="caption"
+                  style={{ color: print.profitCents >= 0 ? colors.sealed : colors.danger }}
+                >
+                  Beneficio {formatSignedCents(print.profitCents)}
+                </AppText>
+              ) : null}
+            </View>
           </Card>
         </Pressable>
       ))}
@@ -89,4 +108,5 @@ const styles = StyleSheet.create({
   summaryValue: { fontSize: 28, fontWeight: '700', letterSpacing: -0.5 },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   rowText: { flex: 1, gap: 2 },
+  amounts: { alignItems: 'flex-end', gap: 2 },
 });

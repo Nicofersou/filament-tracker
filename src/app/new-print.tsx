@@ -31,6 +31,9 @@ import { getSettings } from '../features/settings/repository';
 import { listSpools } from '../features/spools/repository';
 import { formatDateInput, formatDuration } from '../lib/dates';
 import { radius, spacing, useTheme } from '../theme';
+import { ProfitSummary } from '../features/prints/ProfitSummary';
+import { calcProfitCents } from '../features/prints/profit';
+import { parseEurosToCents } from '../lib/money';
 
 const MISSING_MESSAGES: Record<MissingCostParam, string> = {
   spoolPrice: 'Alguna bobina no tiene precio: su material cuenta como 0 €.',
@@ -83,6 +86,8 @@ export default function NewPrintScreen() {
   const [hours, setHours] = useState('');
   const [minutes, setMinutes] = useState('');
   const [notes, setNotes] = useState('');
+  const [salePrice, setSalePrice] = useState('');
+  const [saleFees, setSaleFees] = useState('');
   const [result, setResult] = useState<PrintResult>('success');
   const [printerId, setPrinterId] = useState<number | null>(null);
   const [grams, setGrams] = useState<Record<number, string>>({});
@@ -146,6 +151,8 @@ export default function NewPrintScreen() {
       printerId,
       grams,
       drying: effectiveDrying,
+      salePrice,
+      saleFees,
     });
 
     if (!validation.ok) {
@@ -165,6 +172,7 @@ export default function NewPrintScreen() {
         dryingMin: data.dryingMin,
         result: data.result,
         notes: data.notes,
+        sale: data.sale,
         spools: data.spools,
       });
       router.back();
@@ -212,6 +220,12 @@ export default function NewPrintScreen() {
           },
           energyPricePerKwh: energyPrice,
         })
+      : null;
+  const livePriceCents = parseEurosToCents(salePrice);
+  const liveFeesCents = parseEurosToCents(saleFees) ?? 0;
+  const liveProfitCents =
+    cost && result === 'success' && livePriceCents !== null && livePriceCents > 0
+      ? calcProfitCents(livePriceCents, liveFeesCents, cost.totalCents)
       : null;
 
   return (
@@ -414,7 +428,31 @@ export default function NewPrintScreen() {
           ) : null}
         </>
       ) : null}
-
+      {result === 'success' ? (
+        <>
+          <SectionTitle>Venta (opcional)</SectionTitle>
+          <TextField
+            label="Precio de venta total (€)"
+            value={salePrice}
+            onChangeText={setSalePrice}
+            keyboardType="decimal-pad"
+            placeholder="15,00"
+            hint="Si vendiste varias unidades de esta tanda, la suma de todas. Puedes rellenarlo más tarde desde el detalle."
+            error={errors.salePrice}
+          />
+          {salePrice.trim() !== '' ? (
+            <TextField
+              label="Comisiones y envío (€, opcional)"
+              value={saleFees}
+              onChangeText={setSaleFees}
+              keyboardType="decimal-pad"
+              placeholder="1,50"
+              hint="Lo que se lleva la plataforma de venta, el envío o el embalaje."
+              error={errors.saleFees}
+            />
+          ) : null}
+        </>
+      ) : null}
       <TextField
         label="Notas (opcional)"
         value={notes}
@@ -435,6 +473,14 @@ export default function NewPrintScreen() {
               totalCents={cost.totalCents}
               showDrying={effectiveDrying.enabled}
             />
+            {liveProfitCents !== null && livePriceCents !== null && cost ? (
+              <ProfitSummary
+                salePriceCents={livePriceCents}
+                saleFeesCents={liveFeesCents}
+                totalCostCents={cost.totalCents}
+                profitCents={liveProfitCents}
+              />
+            ) : null}
             {cost.missing.map((key) => (
               <AppText key={key} variant="caption" tone="secondary">
                 {MISSING_MESSAGES[key]}

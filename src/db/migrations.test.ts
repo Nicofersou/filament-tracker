@@ -104,6 +104,55 @@ describe('migrateDbIfNeeded', () => {
     ]);
     await expect(db.runAsync('INSERT INTO settings (id) VALUES (2)')).rejects.toThrow();
   });
+
+  it('migrar de v3 a v4 conserva las impresiones y deja la venta vacía', async () => {
+    const db = createTestDb();
+    await migrateDbIfNeeded(db, 3);
+
+    const printer = await db.runAsync(
+      "INSERT INTO printers (brand, model, dryer_power_w) VALUES ('Anycubic', 'Kobra 4 Combo', 200)",
+    );
+    await db.runAsync(
+      `INSERT INTO prints (printer_id, name, printed_at, duration_min, drying_min, drying_cost_cents)
+       VALUES (?, 'Pieza', '2026-10-30T10:00:00.000Z', 60, 60, 3)`,
+      [printer.lastInsertRowId],
+    );
+
+    await migrateDbIfNeeded(db);
+
+    expect(await getVersion(db)).toBe(DATABASE_VERSION);
+    expect(
+      await db.getAllAsync(
+        'SELECT name, drying_min, drying_cost_cents, sale_price_cents, sale_fees_cents FROM prints',
+      ),
+    ).toEqual([
+      {
+        name: 'Pieza',
+        drying_min: 60,
+        drying_cost_cents: 3,
+        sale_price_cents: null,
+        sale_fees_cents: 0,
+      },
+    ]);
+  });
+
+  it('rechaza importes de venta negativos', async () => {
+    const db = createTestDb();
+    await migrateDbIfNeeded(db);
+    const printer = await db.runAsync("INSERT INTO printers (brand, model) VALUES ('A', 'B')");
+    const print = await db.runAsync(
+      `INSERT INTO prints (printer_id, name, printed_at, duration_min)
+       VALUES (?, 'Pieza', '2026-10-30T10:00:00.000Z', 60)`,
+      [printer.lastInsertRowId],
+    );
+
+    await expect(
+      db.runAsync('UPDATE prints SET sale_price_cents = -1 WHERE id = ?', [print.lastInsertRowId]),
+    ).rejects.toThrow();
+    await expect(
+      db.runAsync('UPDATE prints SET sale_fees_cents = -1 WHERE id = ?', [print.lastInsertRowId]),
+    ).rejects.toThrow();
+  });
 });
 
 describe('integridad referencial del esquema v2', () => {

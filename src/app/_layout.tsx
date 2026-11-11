@@ -31,6 +31,7 @@ export default function RootLayout() {
           options={{ title: 'Nueva impresión', presentation: 'modal' }}
         />
         <Stack.Screen name="print" options={{ title: 'Impresión' }} />
+        <Stack.Screen name="sale" options={{ presentation: 'modal' }} />
       </Stack>
     </SQLiteProvider>
   );

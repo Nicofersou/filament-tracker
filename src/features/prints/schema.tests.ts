@@ -1,5 +1,11 @@
 import { formatDateInput } from '../../lib/dates';
-import { parseGrams, parsePreview, validatePrintForm, type PrintFormValues } from './schema';
+import {
+  parseGrams,
+  parsePreview,
+  validatePrintForm,
+  validateSale,
+  type PrintFormValues,
+} from './schema';
 
 const base: PrintFormValues = {
   name: 'Soporte de auriculares',
@@ -11,6 +17,8 @@ const base: PrintFormValues = {
   printerId: 1,
   grams: { 5: '45,5' },
   drying: { enabled: false, mode: 'same', manualMinutes: '' },
+  salePrice: '',
+  saleFees: '',
 };
 
 describe('parseGrams', () => {
@@ -28,6 +36,45 @@ describe('parseGrams', () => {
   });
 });
 
+describe('validateSale', () => {
+  it('sin precio ni comisiones significa sin venta', () => {
+    expect(validateSale('', '')).toEqual({ ok: true, sale: null });
+    expect(validateSale('  ', ' ')).toEqual({ ok: true, sale: null });
+  });
+
+  it('convierte precio y comisiones a céntimos', () => {
+    expect(validateSale('15,00', '1,50')).toEqual({
+      ok: true,
+      sale: { priceCents: 1500, feesCents: 150 },
+    });
+  });
+
+  it('las comisiones vacías cuentan como 0', () => {
+    expect(validateSale('15', '')).toEqual({
+      ok: true,
+      sale: { priceCents: 1500, feesCents: 0 },
+    });
+  });
+
+  const invalidSaleCases: [string, string, string][] = [
+    ['', '1,50', 'salePrice'],
+    ['abc', '', 'salePrice'],
+    ['0', '', 'salePrice'],
+    ['15,999', '', 'salePrice'],
+    ['200000', '', 'salePrice'],
+    ['15', 'abc', 'saleFees'],
+    ['15', '1,234', 'saleFees'],
+  ];
+
+  it.each(invalidSaleCases)('rechaza precio "%s" con comisiones "%s"', (price, fees, errorKey) => {
+    const result = validateSale(price, fees);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(Object.keys(result.errors)).toContain(errorKey);
+    }
+  });
+});
+
 describe('validatePrintForm', () => {
   it('acepta un formulario válido y lo convierte', () => {
     const result = validatePrintForm(base);
@@ -41,6 +88,7 @@ describe('validatePrintForm', () => {
         result: 'success',
         printerId: 1,
         notes: null,
+        sale: null,
         spools: [{ spoolId: 5, grams: 45.5 }],
       });
       expect(new Date(result.data.printedAt).getDate()).toBe(new Date().getDate());
@@ -79,6 +127,22 @@ describe('validatePrintForm', () => {
     }
   });
 
+  it('incluye la venta de una impresión correcta', () => {
+    const result = validatePrintForm({ ...base, salePrice: '15,00', saleFees: '1,50' });
+    expect(result.ok && result.data.sale).toEqual({ priceCents: 1500, feesCents: 150 });
+  });
+
+  it('una impresión fallida ignora los campos de venta', () => {
+    const result = validatePrintForm({
+      ...base,
+      result: 'failed',
+      salePrice: 'abc',
+      saleFees: '',
+    });
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.data.sale).toBeNull();
+  });
+
   const dayAfterTomorrow = formatDateInput(new Date(Date.now() + 2 * 24 * 60 * 60 * 1000));
 
   const invalidCases: [string, Partial<PrintFormValues>, string][] = [
@@ -104,6 +168,9 @@ describe('validatePrintForm', () => {
       'drying',
     ],
     ['notas demasiado largas', { notes: 'a'.repeat(501) }, 'notes'],
+    ['precio de venta inválido', { salePrice: 'abc' }, 'salePrice'],
+    ['comisiones sin precio de venta', { saleFees: '1,50' }, 'salePrice'],
+    ['comisiones inválidas', { salePrice: '15', saleFees: 'abc' }, 'saleFees'],
   ];
 
   it.each(invalidCases)('rechaza %s', (_name, override, errorKey) => {

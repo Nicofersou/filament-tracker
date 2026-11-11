@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { parseDateInput } from '../../lib/dates';
 import { optionalPattern } from '../../lib/validation';
 import type { PrintResult } from './types';
+import { parseEurosToCents } from '../../lib/money';
 
 const MAX_DURATION_MIN = 7 * 24 * 60;
 const MAX_GRAMS = 50000;
@@ -24,6 +25,8 @@ export interface PrintFormValues {
   /** Gramos escritos para cada bobina seleccionada (clave: id de la bobina). */
   grams: Record<number, string>;
   drying: DryingValues;
+  salePrice: string;
+  saleFees: string;
 }
 
 export interface ParsedPrintForm {
@@ -35,6 +38,7 @@ export interface ParsedPrintForm {
   printerId: number;
   notes: string | null;
   spools: { spoolId: number; grams: number }[];
+  sale: { priceCents: number; feesCents: number } | null;
 }
 
 export type PrintFormValidation =
@@ -85,6 +89,40 @@ export function parsePreview(values: Pick<PrintFormValues, 'hours' | 'minutes' |
     dryingMin = values.drying.mode === 'same' ? durationMin : asInt(values.drying.manualMinutes);
   }
   return { durationMin, dryingMin };
+}
+
+const MAX_SALE_CENTS = 10000000; // 100.000 €
+
+export type SaleValidation =
+  | { ok: true; sale: { priceCents: number; feesCents: number } | null }
+  | { ok: false; errors: { salePrice?: string; saleFees?: string } };
+
+/** Precio y comisiones vacíos significan "sin venta". Si hay venta, el precio es obligatorio. */
+export function validateSale(priceText: string, feesText: string): SaleValidation {
+  const price = priceText.trim();
+  const fees = feesText.trim();
+  if (price === '' && fees === '') return { ok: true, sale: null };
+
+  const errors: { salePrice?: string; saleFees?: string } = {};
+
+  const priceCents = parseEurosToCents(price);
+  if (price === '') errors.salePrice = 'Indica el precio de venta';
+  else if (priceCents === null) errors.salePrice = 'Precio no válido (ej. 15,00)';
+  else if (priceCents <= 0) errors.salePrice = 'El precio debe ser mayor que 0';
+  else if (priceCents > MAX_SALE_CENTS) errors.salePrice = 'El precio es demasiado alto';
+
+  let feesCents = 0;
+  if (fees !== '') {
+    const parsedFees = parseEurosToCents(fees);
+    if (parsedFees === null) errors.saleFees = 'Importe no válido (ej. 1,50)';
+    else if (parsedFees > MAX_SALE_CENTS) errors.saleFees = 'El importe es demasiado alto';
+    else feesCents = parsedFees;
+  }
+
+  if (errors.salePrice !== undefined || errors.saleFees !== undefined || priceCents === null) {
+    return { ok: false, errors };
+  }
+  return { ok: true, sale: { priceCents, feesCents } };
 }
 
 export function validatePrintForm(values: PrintFormValues): PrintFormValidation {
@@ -149,6 +187,16 @@ export function validatePrintForm(values: PrintFormValues): PrintFormValidation 
     }
   }
 
+  let sale: { priceCents: number; feesCents: number } | null = null;
+  if (values.result === 'success') {
+    const saleResult = validateSale(values.salePrice, values.saleFees);
+    if (saleResult.ok) {
+      sale = saleResult.sale;
+    } else {
+      Object.assign(errors, saleResult.errors);
+    }
+  }
+
   const printerId = values.printerId;
   const date = parseDateInput(values.date);
   if (Object.keys(errors).length > 0 || printerId === null || date === null) {
@@ -166,6 +214,7 @@ export function validatePrintForm(values: PrintFormValues): PrintFormValidation 
       printerId,
       notes: values.notes.trim() === '' ? null : values.notes.trim(),
       spools,
+      sale,
     },
   };
 }

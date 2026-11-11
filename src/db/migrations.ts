@@ -84,7 +84,17 @@ const migrateToV3: Migration = async (db) => {
   `);
 };
 
-const MIGRATIONS: Migration[] = [migrateToV1, migrateToV2, migrateToV3];
+/** v4: venta de cada impresión (precio total y comisiones o envío). */
+const migrateToV4: Migration = async (db) => {
+  await db.execAsync(`
+    ALTER TABLE prints ADD COLUMN sale_price_cents INTEGER
+      CHECK (sale_price_cents IS NULL OR sale_price_cents >= 0);
+    ALTER TABLE prints ADD COLUMN sale_fees_cents INTEGER NOT NULL DEFAULT 0
+      CHECK (sale_fees_cents >= 0);
+  `);
+};
+
+const MIGRATIONS: Migration[] = [migrateToV1, migrateToV2, migrateToV3, migrateToV4];
 export const DATABASE_VERSION = MIGRATIONS.length;
 
 /**

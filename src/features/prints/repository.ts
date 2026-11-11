@@ -4,8 +4,10 @@ import { getSettings } from '../settings/repository';
 import { getSpoolById } from '../spools/repository';
 import type { Material } from '../spools/types';
 import { calcMaterialCostCents, calcPrintCost } from './costs';
+import { calcProfitCents } from './profit';
 import {
   CreatePrintError,
+  PrintSaleError,
   type NewPrint,
   type PrintDetail,
   type PrintListItem,
@@ -23,6 +25,8 @@ interface PrintRow {
   energy_cost_cents: number;
   wear_cost_cents: number;
   drying_cost_cents: number;
+  sale_price_cents: number | null;
+  sale_fees_cents: number;
   notes: string | null;
   printer_brand: string;
   printer_model: string;
@@ -32,7 +36,8 @@ interface PrintRow {
 // Constante del código (nunca texto del usuario): se le añade WHERE/ORDER BY fijos.
 const PRINT_SELECT = `
   SELECT p.id, p.printer_id, p.name, p.printed_at, p.duration_min, p.drying_min, p.result,
-         p.energy_cost_cents, p.wear_cost_cents, p.drying_cost_cents, p.notes,
+         p.energy_cost_cents, p.wear_cost_cents, p.drying_cost_cents,
+         p.sale_price_cents, p.sale_fees_cents, p.notes,
          pr.brand AS printer_brand, pr.model AS printer_model,
          COALESCE(
            (SELECT SUM(u.cost_cents) FROM print_spool_usages u WHERE u.print_id = p.id), 0
@@ -41,6 +46,9 @@ const PRINT_SELECT = `
     JOIN printers pr ON pr.id = p.printer_id`;
 
 function toListItem(row: PrintRow): PrintListItem {
+  const totalCostCents =
+    row.material_cost_cents + row.energy_cost_cents + row.wear_cost_cents + row.drying_cost_cents;
+
   return {
     id: row.id,
     printerId: row.printer_id,
@@ -54,8 +62,10 @@ function toListItem(row: PrintRow): PrintListItem {
     energyCostCents: row.energy_cost_cents,
     wearCostCents: row.wear_cost_cents,
     dryingCostCents: row.drying_cost_cents,
-    totalCostCents:
-      row.material_cost_cents + row.energy_cost_cents + row.wear_cost_cents + row.drying_cost_cents,
+    totalCostCents,
+    salePriceCents: row.sale_price_cents,
+    saleFeesCents: row.sale_fees_cents,
+    profitCents: calcProfitCents(row.sale_price_cents, row.sale_fees_cents, totalCostCents),
     notes: row.notes,
   };
 }
@@ -67,6 +77,11 @@ export async function createPrint(db: SQLiteDatabase, input: NewPrint): Promise<
   const spoolIds = input.spools.map((item) => item.spoolId);
   if (new Set(spoolIds).size !== spoolIds.length) {
     throw new CreatePrintError('DUPLICATE_SPOOL');
+  }
+
+  const sale = input.sale ?? null;
+  if (sale !== null && input.result === 'failed') {
+    throw new PrintSaleError('PRINT_FAILED');
   }
 
   const dryingMin = input.dryingMin ?? 0;
@@ -113,8 +128,9 @@ export async function createPrint(db: SQLiteDatabase, input: NewPrint): Promise<
     const result = await db.runAsync(
       `INSERT INTO prints
          (printer_id, name, printed_at, duration_min, drying_min, result,
-          energy_cost_cents, wear_cost_cents, drying_cost_cents, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          energy_cost_cents, wear_cost_cents, drying_cost_cents,
+          sale_price_cents, sale_fees_cents, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         input.printerId,
         input.name,
@@ -125,6 +141,8 @@ export async function createPrint(db: SQLiteDatabase, input: NewPrint): Promise<
         cost.energyCents,
         cost.wearCents,
         cost.dryingCents,
+        sale?.priceCents ?? null,
+        sale?.feesCents ?? 0,
         input.notes ?? null,
       ],
     );
@@ -151,6 +169,25 @@ export async function createPrint(db: SQLiteDatabase, input: NewPrint): Promise<
   });
 
   return printId;
+}
+
+/** Registra, cambia o quita (con null) la venta de una impresión. Las fallidas no se venden. */
+export async function updatePrintSale(
+  db: SQLiteDatabase,
+  printId: number,
+  sale: { priceCents: number; feesCents: number } | null,
+): Promise<void> {
+  const row = await db.getFirstAsync<{ result: string }>('SELECT result FROM prints WHERE id = ?', [
+    printId,
+  ]);
+  if (!row) throw new PrintSaleError('PRINT_NOT_FOUND');
+  if (sale !== null && row.result === 'failed') throw new PrintSaleError('PRINT_FAILED');
+
+  await db.runAsync('UPDATE prints SET sale_price_cents = ?, sale_fees_cents = ? WHERE id = ?', [
+    sale?.priceCents ?? null,
+    sale?.feesCents ?? 0,
+    printId,
+  ]);
 }
 
 export async function listPrints(db: SQLiteDatabase): Promise<PrintListItem[]> {
